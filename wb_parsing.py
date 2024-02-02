@@ -10,12 +10,14 @@ from aiogram.enums import ParseMode
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import random
+from aiogram import html
+
 
 API_KEY = config.API_KEY
 bot = Bot(API_KEY)
 logging.basicConfig(level=logging.ERROR)
 
-chat_id = '-1002094001727'
+chat_id = config.CHAT_ID
 
 headers = {
     'authority': 'www.wildberries.by',
@@ -36,7 +38,6 @@ headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 }
 
-
 width = 900
 height = 1100
 
@@ -46,69 +47,79 @@ chrome_options.add_argument(f'--window-size={width},{height}')
 
 
 async def start():
-    while True:
-        with open('urls_by.csv', 'r') as f:
-            read = list(csv.reader(f, delimiter=';'))
-            try:
-                if len(read):
-                    random_row = random.choice(read[1:])
-                    ids, _, _, nodes = random_row
-                    try:
-                        response = requests.get(
-                            f'https://catalog.wb.ru/catalog/{nodes}/v1/catalog?cat={ids}&limit=100&sort=popular&'
-                            f'page={1}&appType=128&curr=byn&lang=ru&dest=-59208&spp=30&&discount=70&'
-                            f'TestGroup=no_test&TestID=no_test', headers=headers).json()
+    with open('urls_by.csv', 'r') as f:
+        read = list(csv.reader(f, delimiter=';'))
+        try:
+            if len(read):
+                random_row = random.choice(read[1:])
+                ids, _, _, nodes = random_row
+                response = requests.get(
+                    f'https://catalog.wb.ru/catalog/{nodes}/v1/catalog?cat={ids}&limit=100&sort=popular&'
+                    f'page={1}&appType=128&curr=byn&lang=ru&dest=-59208&spp=30&&discount=70&'
+                    f'TestGroup=no_test&TestID=no_test', headers=headers).json()
+                await parser_cards(response, ids)
+        except requests.RequestException as e:
+            logging.error(f"An error occurred: {e}")
 
-                        for product in response['data']['products']:
-                            i = product['id']
-                            name = product['name']
-                            salePriceU = str(product['salePriceU'])
-                            salePrice = f"{salePriceU[:-2]}.{salePriceU[-2:]}"
-                            sale = product['sale']
-                            brand = product['brand']
-                            if int(salePriceU[:-2]) <= 70:
-                                result_message = (f"<u>Название</u>:  <b>{name}</b>\n"
-                                                  f"<u>Цена</u>:  <b>{salePrice}</b>\n"
-                                                  f"<u>Скидка</u>:  <b>{sale}%</b>\n"
-                                                  f"<u>Бренд</u>:  <b>{brand}</b>\n"
-                                                  f'<u>Ссылка</u>:  <a href="https://www.wildberries.by/product?card={i}&category={ids}">{name}</a>')
-                                await selenium_image(f'https://www.wildberries.by/product?card={i}&category={ids}">{name}')
-                                await tg_chanal(result_message)
-                            else:
-                                continue
-                            await asyncio.sleep(0)
-                    except requests.RequestException as e:
-                        logging.error(f"An error occurred: {e}")
-                        continue
+
+
+async def parser_cards(response, ids):
+    list_cards = []
+    for product in response['data']['products']:
+            try:
+                i = product['id']
+                name = product['name']
+                salePriceU = str(product['salePriceU'])
+                salePrice = f"{salePriceU[:-2]}.{salePriceU[-2:]}"
+                sale = product['sale']
+                brand = product['brand']
+                if int(salePriceU[:-2]) <= 70:
+                    list_cards.append({"Название": name,
+                                       "Цена": salePrice,
+                                       "Скидка": sale,
+                                       "Бренд": brand,
+                                       "Ссылка": f'https://www.wildberries.by/product?card={i}&category={ids}'})
             except: continue
 
+    if list_cards:  # Проверяем, что список не пуст
+        random_cards = random.choice(list_cards)
+        await selenium_image(random_cards)
 
-async def tg_chanal(result_message):
+
+async def tg_chanal(random_cards):
+    result_message = (f"✅<u>Название</u>:  <b>{random_cards['Название']}</b>\n"
+                      f"💵 <u>Цена</u>:  <b>{random_cards['Цена']}</b>\n"
+                      f"🔥 <u>Скидка</u> 🔥:  <b>{random_cards['Скидка']}%</b>\n"
+                      f"®️<u>Бренд</u>:  <b>{random_cards['Бренд']}</b>\n"
+                      f'➡️<u>Ссылка</u>:  <a href="{random_cards["Ссылка"]}">{random_cards["Название"]}</a>')
     photo_path = 'D:\wb_parser\screenshot.png'  # Replace with the actual path to your photo
     photo = FSInputFile(photo_path)
     await bot.send_photo(chat_id=chat_id, photo=photo, caption=result_message, parse_mode=ParseMode.HTML)
 
 
-async def selenium_image(link):
+async def selenium_image(random_cards):
     driver = webdriver.Chrome(options=chrome_options)
-    url = link
+    url = random_cards['Ссылка']
     driver.get(url)
-    time.sleep(10)
+    time.sleep(20)
     screenshot_path = 'screenshot.png'
     driver.save_screenshot(screenshot_path)
-
     # Закрываем браузер
     driver.quit()
-    return
+    await tg_chanal(random_cards)
+
+
+async def main():
+    while True:
+        await start()
+
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.create_task(start())
+    loop.create_task(main())
     try:
         loop.run_forever()
     except KeyboardInterrupt:
         pass
     finally:
         loop.close()
-
-
