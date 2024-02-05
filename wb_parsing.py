@@ -7,6 +7,7 @@ import asyncio
 import config
 from aiogram import Bot, types
 from aiogram.enums import ParseMode
+from aiogram.utils.keyboard import InlineKeyboardMarkup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import random
@@ -15,7 +16,7 @@ from aiogram import html
 
 API_KEY = config.API_KEY
 bot = Bot(API_KEY)
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO)
 
 chat_id = config.CHAT_ID
 
@@ -90,11 +91,13 @@ async def tg_chanal(random_cards):
     result_message = (f"✅<u>Название</u>:  <b>{random_cards['Название']}</b>\n"
                       f"💵 <u>Цена</u>:  <b>{random_cards['Цена']}</b>\n"
                       f"🔥 <u>Скидка</u> 🔥:  <b>{random_cards['Скидка']}%</b>\n"
-                      f"®️<u>Бренд</u>:  <b>{random_cards['Бренд']}</b>\n"
-                      f'➡️<u>Ссылка</u>:  <a href="{random_cards["Ссылка"]}">{random_cards["Название"]}</a>')
+                      f"®️<u>Бренд</u>:  <b>{random_cards['Бренд']}</b>\n")
+    logging.info(result_message)
+    button = types.InlineKeyboardButton(text=random_cards["Название"], url=random_cards["Ссылка"])
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[button]])
     photo_path = 'D:\wb_parser\screenshot.png'  # Replace with the actual path to your photo
     photo = FSInputFile(photo_path)
-    await bot.send_photo(chat_id=chat_id, photo=photo, caption=result_message, parse_mode=ParseMode.HTML)
+    await bot.send_photo(chat_id=chat_id, photo=photo, caption=result_message, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 async def selenium_image(random_cards):
